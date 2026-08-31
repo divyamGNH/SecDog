@@ -1,9 +1,10 @@
+import 'dotenv/config';
 import express, { Request, Response } from 'express';
 import cors from 'cors';
 import multer from 'multer';
 import { EventEmitter } from 'events';
 import { sentinelMiddleware } from './middleware';
-import { getAlerts } from './db';
+import { closeDatabase, getAlerts, initializeDatabase } from './db';
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -20,6 +21,9 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 const upload = multer({ storage: multer.memoryStorage() });
+
+// Multipart bodies must be parsed before Sentinel so the upload detector can inspect req.file.
+app.use('/upload', upload.single('file'));
 
 // --- SENTINEL MIDDLEWARE PIPELINE ---
 app.use(sentinelMiddleware);
@@ -47,7 +51,7 @@ app.get('/fetch', (req: Request, res: Response) => {
   res.json({ message: `Fetched from ${url} successfully.` });
 });
 
-app.post('/upload', upload.single('file'), (req: Request, res: Response) => {
+app.post('/upload', (req: Request, res: Response) => {
   if (!req.file) {
     return res.status(400).json({ error: 'No file uploaded' });
   }
@@ -94,6 +98,28 @@ app.get('/alerts/stream', (req: Request, res: Response) => {
   });
 });
 
-app.listen(port, () => {
-  console.log(`SentinelAPI server listening on http://localhost:${port}`);
-});
+async function startServer() {
+  try {
+    await initializeDatabase();
+    const server = app.listen(port, () => {
+      console.log(`SentinelAPI server listening on http://localhost:${port}`);
+      console.log('PostgreSQL connection and alerts table are ready.');
+    });
+
+    const shutdown = () => {
+      server.close(() => {
+        closeDatabase()
+          .catch(err => console.error('Failed to close PostgreSQL pool:', err))
+          .finally(() => process.exit(0));
+      });
+    };
+
+    process.on('SIGINT', shutdown);
+    process.on('SIGTERM', shutdown);
+  } catch (err) {
+    console.error('Failed to initialize PostgreSQL:', err);
+    process.exit(1);
+  }
+}
+
+startServer();

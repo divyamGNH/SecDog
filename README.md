@@ -1,33 +1,67 @@
 # SentinelAPI — Signature-Based Intrusion Detection Middleware
 
-This project is a small REST API protected by a custom intrusion-detection middleware layer that detects 11 distinct categories of attacks in real time, logs them to a SQLite database, and displays them on a live dashboard.
+This project is a small REST API protected by a custom intrusion-detection middleware layer that detects 11 distinct categories of attacks in real time, logs them to a local PostgreSQL database, and displays them on a live dashboard.
 
 ## Requirements
 - Node.js (v18+ recommended)
 - npm
+- PostgreSQL 14+ with the `psql` command available
 
 ## How to Run
 
-1. **Install dependencies and setup database:**
+1. **Create the local PostgreSQL database:**
    \`\`\`bash
-   npm install
-   npx prisma db push
+   brew services start postgresql@16
+   createdb sentinelapi
    \`\`\`
 
-2. **Start the API Server:**
+   If your PostgreSQL user/password differs, copy `.env.example` to `.env` and edit `DATABASE_URL`. The API automatically creates the `alerts` table and its index at startup.
+
+2. **Install backend dependencies:**
+   \`\`\`bash
+   npm install
+   \`\`\`
+
+3. **Start the API Server:**
    \`\`\`bash
    npm run dev
    \`\`\`
    The server will start on `http://localhost:3000`.
 
-3. **Open the Dashboard:**
-   Simply double-click `dashboard/index.html` to open it in your browser, or serve it via a local static file server. It will automatically connect to the live API via Server-Sent Events (SSE).
+4. **Start the Dashboard (in a second terminal):**
+   \`\`\`bash
+   cd dashboard
+   npm install
+   npm run dev
+   \`\`\`
+   Open the URL printed by Vite (normally `http://localhost:5173`). It connects to the API using Server-Sent Events (SSE).
 
-4. **Run the Attack Simulation (in a separate terminal):**
+5. **Run the Attack Simulation (in a third terminal, from the project root):**
    \`\`\`bash
    npm run test:sim
    \`\`\`
    Follow the interactive prompts in the terminal to step through the simulated attacks one by one. Watch the dashboard update in real time.
+
+## PostgreSQL Configuration
+
+The default connection string is:
+
+\`\`\`text
+postgresql://localhost:5432/sentinelapi
+\`\`\`
+
+Override it with `DATABASE_URL` in `.env`, for example:
+
+\`\`\`text
+DATABASE_URL=postgresql://myuser:mypassword@localhost:5432/sentinelapi
+\`\`\`
+
+Useful checks:
+
+\`\`\`bash
+psql sentinelapi -c '\\d alerts'
+psql sentinelapi -c 'SELECT id, detector_name, severity, timestamp FROM alerts ORDER BY timestamp DESC LIMIT 10;'
+\`\`\`
 
 ## Syllabus Mapping
 

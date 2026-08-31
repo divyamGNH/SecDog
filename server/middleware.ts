@@ -39,7 +39,7 @@ const detectors: Detector[] = [
   enumDetector // Not technically possible to run effectively on request entry if it tracks 404s, but we'll adapt it.
 ];
 
-export function sentinelMiddleware(req: Request, res: Response, next: NextFunction) {
+export async function sentinelMiddleware(req: Request, res: Response, next: NextFunction) {
   const ip = req.ip || req.connection.remoteAddress || 'unknown';
 
   const context: RequestContext = {
@@ -60,14 +60,14 @@ export function sentinelMiddleware(req: Request, res: Response, next: NextFuncti
       
       if (result) {
         // Log alert
-        insertAlert({
+        await insertAlert({
           source_ip: ip,
           detector_name: result.detectorName,
           severity: result.severity,
           matched_payload: result.matchedPayload || '',
           request_path: req.originalUrl,
           reason: result.reason
-        }).catch(err => console.error('Failed to log alert:', err));
+        });
 
         // Broadcast to SSE clients (will implement an EventEmitter in index.ts)
         req.app.emit('new-alert');
@@ -85,7 +85,7 @@ export function sentinelMiddleware(req: Request, res: Response, next: NextFuncti
   if (!isBlocked) {
     // We need to capture 404s for the enumDetector.
     // We'll hook into the response finish event.
-    res.on('finish', () => {
+    res.on('finish', async () => {
       if (res.statusCode === 404) {
         // Track 404s
         let counts = context.notFoundCountsByIp.get(ip) || [];
@@ -97,15 +97,19 @@ export function sentinelMiddleware(req: Request, res: Response, next: NextFuncti
 
         if (counts.length >= 15) {
           // Flag as enumeration
-          insertAlert({
-            source_ip: ip,
-            detector_name: enumDetector.name,
-            severity: 'medium',
-            matched_payload: '',
-            request_path: req.originalUrl,
-            reason: `Endpoint enumeration detected (${counts.length} 404s in 20s)`
-          }).catch(console.error);
-          req.app.emit('new-alert');
+          try {
+            await insertAlert({
+              source_ip: ip,
+              detector_name: enumDetector.name,
+              severity: 'medium',
+              matched_payload: '',
+              request_path: req.originalUrl,
+              reason: `Endpoint enumeration detected (${counts.length} 404s in 20s)`
+            });
+            req.app.emit('new-alert');
+          } catch (err) {
+            console.error('Failed to log endpoint enumeration alert:', err);
+          }
           // clear counts after alerting to prevent spam
           context.notFoundCountsByIp.set(ip, []);
         }

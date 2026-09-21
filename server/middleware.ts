@@ -40,6 +40,12 @@ const detectors: Detector[] = [
 ];
 
 export async function sentinelMiddleware(req: Request, res: Response, next: NextFunction) {
+  // Monitoring endpoints must stay reachable even when the local attack
+  // simulator temporarily blocks its own localhost IP during the DDoS demo.
+  if (req.path === '/alerts' || req.path.startsWith('/alerts/')) {
+    return next();
+  }
+
   const ip = req.ip || req.connection.remoteAddress || 'unknown';
 
   const context: RequestContext = {

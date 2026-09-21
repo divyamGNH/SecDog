@@ -24,7 +24,7 @@ export const fileUploadDetector: Detector = {
         return {
           detectorName: this.name,
           severity: 'high',
-          matchedPayload: str.substring(0, 10),
+          matchedPayload: hex.substring(0, 20),
           reason: `Malicious file magic bytes detected (${file.originalname})`
         };
       }

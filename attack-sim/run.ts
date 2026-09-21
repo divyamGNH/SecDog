@@ -5,7 +5,7 @@ const rl = readline.createInterface({
   output: process.stdout
 });
 
-const pause = () => new Promise<void>(resolve => rl.question('\\n>>> Press <Enter> to fire this attack...', () => resolve()));
+const pause = () => new Promise<void>(resolve => rl.question('\n>>> Press <Enter> to fire this attack...', () => resolve()));
 
 const BASE_URL = 'http://localhost:3000';
 
@@ -75,17 +75,11 @@ const attacks = [
     name: 'Malicious File Upload',
     desc: 'Uploading a Windows Executable (MZ) disguised as a harmless PNG image.',
     run: async () => {
-      // Crafting a raw multipart form data payload with MZ signature
-      const boundary = '----WebKitFormBoundary7MA4YWxkTrZu0gW';
-      let body = `--${boundary}\\r\\n`;
-      body += `Content-Disposition: form-data; name="file"; filename="innocent.png"\\r\\n`;
-      body += `Content-Type: image/png\\r\\n\\r\\n`;
-      body += `MZ\\x90\\x00\\x03\\x00\\x00\\x00... this is actually an exe\\r\\n`;
-      body += `--${boundary}--\\r\\n`;
-
+      const body = new FormData();
+      const executable = Uint8Array.from([0x4d, 0x5a, 0x90, 0x00, 0x03, 0x00]);
+      body.append('file', new Blob([executable], { type: 'image/png' }), 'innocent.png');
       await fetch(`${BASE_URL}/upload`, {
         method: 'POST',
-        headers: { 'Content-Type': `multipart/form-data; boundary=${boundary}` },
         body: body
       });
     }
@@ -124,10 +118,10 @@ const attacks = [
 async function main() {
   console.log('====================================================');
   console.log('   SentinelAPI Attack Simulation Tool');
-  console.log('====================================================\\n');
+  console.log('====================================================\n');
   
   for (const attack of attacks) {
-    console.log(`\\n[NEXT ATTACK] ${attack.name}`);
+    console.log(`\n[NEXT ATTACK] ${attack.name}`);
     console.log(`Description : ${attack.desc}`);
     await pause();
     console.log(`> Firing ${attack.name} payload...`);
@@ -139,7 +133,7 @@ async function main() {
     }
   }
 
-  console.log('\\nAll attacks simulated successfully.');
+  console.log('\nAll attacks simulated successfully.');
   rl.close();
 }
 

@@ -1,7 +1,7 @@
 import { Detector, RequestContext, DetectionResult } from '../types';
 import { Request } from 'express';
 
-const PATH_TRAVERSAL_PATTERN = /\.\.\/|\.\.\\|%2e%2e%2f|\/etc\/passwd|C:\\Windows/i;
+const PATH_TRAVERSAL_PATTERN = /(?:\.\.|%2e%2e)(?:\/|\\|%2f)|\/etc\/passwd|C:\\Windows/i;
 
 export const pathTraversalDetector: Detector = {
   name: 'Path Traversal',
@@ -9,7 +9,8 @@ export const pathTraversalDetector: Detector = {
     const targets = [
       req.originalUrl,
       ...Object.values(req.query),
-      ...Object.values(req.body || {})
+      ...Object.values(req.body || {}),
+      ...Object.values(req.params || {})
     ].filter(v => typeof v === 'string') as string[];
 
     for (const target of targets) {

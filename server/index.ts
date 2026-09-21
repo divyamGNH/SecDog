@@ -22,6 +22,26 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 const upload = multer({ storage: multer.memoryStorage() });
 
+// Demo authentication. This intentionally uses fixed credentials so the project
+// can be presented without adding a full users table or password-reset flow.
+const DEMO_TOKEN = 'sentinel-demo-token';
+app.post('/auth/login', (req: Request, res: Response) => {
+  const { username, password } = req.body;
+  if (username === 'admin' && password === 'sentinel123') {
+    return res.json({ token: DEMO_TOKEN, user: { name: 'Security Admin', username: 'admin', role: 'Administrator' } });
+  }
+  return res.status(401).json({ error: 'Invalid username or password' });
+});
+
+function requireDemoAuth(req: Request, res: Response, next: () => void) {
+  const bearer = req.headers.authorization?.replace('Bearer ', '');
+  const streamToken = typeof req.query.token === 'string' ? req.query.token : '';
+  if (bearer !== DEMO_TOKEN && streamToken !== DEMO_TOKEN) {
+    return res.status(401).json({ error: 'Authentication required' });
+  }
+  next();
+}
+
 // Multipart bodies must be parsed before Sentinel so the upload detector can inspect req.file.
 app.use('/upload', upload.single('file'));
 
@@ -67,7 +87,7 @@ app.get('/profile/:id', (req: Request, res: Response) => {
 // --- DASHBOARD API ENDPOINTS ---
 
 // Fetch past alerts
-app.get('/alerts', async (req: Request, res: Response) => {
+app.get('/alerts', requireDemoAuth, async (req: Request, res: Response) => {
   try {
     const alerts = await getAlerts();
     res.json(alerts);
@@ -77,7 +97,7 @@ app.get('/alerts', async (req: Request, res: Response) => {
 });
 
 // Server-Sent Events for real-time dashboard
-app.get('/alerts/stream', (req: Request, res: Response) => {
+app.get('/alerts/stream', requireDemoAuth, (req: Request, res: Response) => {
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
